@@ -69,7 +69,7 @@ namespace evemap_core
                         F.ShowDialog();
                     });
                     t.SetApartmentState(ApartmentState.STA);
-//                    t.Start();
+                    t.Start();
                     
 
                 }

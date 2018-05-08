@@ -91,15 +91,18 @@ namespace evemap_core
         {
             var npcs=DAL.GetNpcInfs();
             Color npcclolr = Color.FromArgb(0, 0, 0, 0);
-            var npc = npcs.GroupBy(p => p.npcid).Select(p => p.First()).Select(p => new Alliance()
-            {
-                id = p.npcid,
-                name = p.name,
-                colorString = "000000",isNPC = true
-            }).ToDictionary(p => p.id, p => p);
+           
             foreach (var npcInf in npcs)
             {
-                addInfluence(solarSystems[npcInf.systemid],npcInf.inf,npc[npcInf.npcid],4,new List<GraphicModel.SolarSystem>());
+                var alliance = new Alliance()
+                {
+                    id = npcInf.npcid,
+                    name = npcInf.name,
+                    colorString = "000000",
+                    isNPC = true
+                };
+                this.alliances[npcInf.npcid] = alliance;
+                addInfluence(solarSystems[npcInf.systemid],npcInf.inf, alliance, 4,new List<GraphicModel.SolarSystem>());
             }
         }
 

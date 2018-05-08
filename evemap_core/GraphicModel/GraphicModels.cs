@@ -35,7 +35,7 @@ namespace evemap_core.GraphicModel
             this.x = (int) Util.ChinaRound(systemmodel.x / MapConstants.SCALE + MapConstants.HORIZONTAL_SIZE / 2.0 +
                                            MapConstants.HORIZONTAL_OFFSET);
             this.y = (int)Util.ChinaRound(systemmodel.z / MapConstants.SCALE + MapConstants.VERTICAL_SIZE / 2.0 +
-                                          MapConstants.HORIZONTAL_OFFSET);
+                                          MapConstants.VERTICAL_OFFSET);
         }
 
         public int constellationid => systemmodel.constellationid;

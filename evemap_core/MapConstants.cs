@@ -29,5 +29,8 @@ namespace evemap_core
         //	Scaling factor
         public static  double SCALE = 4.8445284569785E17 / ((VERTICAL_SIZE - 20) / 2.0);
 
+
+        public static int CALC_SAMPLE = 128;
+
     }
 }

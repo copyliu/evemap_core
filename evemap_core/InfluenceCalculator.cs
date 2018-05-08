@@ -24,7 +24,7 @@ namespace evemap_core
         private static double INSENSITIVITY = 500;
         private static double VALIDINF = 0.023;
 
-        Dictionary<Alliance, double> totalInf = new Dictionary<Alliance, double>();
+        Dictionary<long, double> totalInf = new Dictionary<long, double>();
 
         private int x_from;
         private int x_to;
@@ -72,7 +72,8 @@ namespace evemap_core
                     getTotalInfluenceforPoint(x, currentRow, sSov, totalInf);
 
                     max = 0.0;
-                    Alliance best = getAllianceWithHighestInfluence(totalInf, false);
+                    var bestalliid = getAllianceWithHighestInfluence(totalInf, false);
+                    var best = bestalliid.HasValue ? alliances[bestalliid.Value] : null;
 
                     int q = x - x_from;
                     if (best != null)
@@ -87,10 +88,11 @@ namespace evemap_core
                             {
                                 //TODO 新顏色
                             }
+
                             DAL.saveColor(best);
                         }
 
-                        
+
                         best.translate(x, currentRow);
                         best.incrementCount();
                     }
@@ -123,33 +125,36 @@ namespace evemap_core
                     prevInf[q] = max;
                     curBorder[q] = currentRow == 0 || prevRow[q] == null && best != null ||
                                    prevRow[q] != null && best == null || prevRow[q] != null && prevRow[q] != best;
-                    Array.Copy(curRow, prevRow, curRow.Length);
-                    if (currentRow == MapConstants.VERTICAL_SIZE - 1)
-                    {
-                        break;
-                    }
+
 
 
                 }
 
-                flush();
-                Array.Copy(prevInf, 0, map.previnf, x_from, x_to - x_from - 1);
-                Array.Copy(curRow, 0, map.prevRow, x_from, x_to - x_from);
-                lock (map.sovMap)
+                Array.Copy(curRow, prevRow, curRow.Length);
+                if (currentRow == MapConstants.VERTICAL_SIZE - 1)
                 {
-                    for (int i = 0; i < sovMap.Rank; i++)
+                    break;
+                }
+            }
+
+            flush();
+            Array.Copy(prevInf, 0, map.previnf, x_from, x_to - x_from - 1);
+            Array.Copy(curRow, 0, map.prevRow, x_from, x_to - x_from);
+            lock (map.sovMap)
+            {
+                for (int i = 0; i < sovMap.Rank; i++)
+                {
+                    for (int j = 0; j < sovMap.GetLength(i); j++)
                     {
-                        for (int j = 0; j < sovMap.GetLength(i); j++)
+                        if (sovMap[i, j] != null)
                         {
-                            if (sovMap[i, j] != null)
-                            {
-                                map.sovMap[i, j] = sovMap[i, j];
-                            }
+                            map.sovMap[i, j] = sovMap[i, j];
                         }
                     }
                 }
             }
         }
+
 
         private void flush()
         {
@@ -170,8 +175,8 @@ namespace evemap_core
             {
 //                map.dataManager.outputImage.SetPixel(x,y,c);
 
-//                lock (map.dataManager.graphics)
-//                { map.dataManager.graphics.FillRectangle(new SolidBrush(c), x, y, 1, 1);}
+                lock (map.dataManager.graphics)
+                { map.dataManager.graphics.FillRectangle(new SolidBrush(c), x, y, 1, 1);}
             }
 
         }
@@ -187,8 +192,8 @@ namespace evemap_core
 
             Color c = Color.FromArgb(border ? Math.Max(0x48, alpha) : alpha, cprevRow[q].color);
 //            map.dataManager.outputImage.SetPixel(x, y, c);
-//            lock (map.dataManager.graphics)
-//            { map.dataManager.graphics.FillRectangle(new SolidBrush(c), x, y-1, 1, 1);}
+            lock (map.dataManager.graphics)
+            { map.dataManager.graphics.FillRectangle(new SolidBrush(c), x, y-1, 1, 1);}
           
             
 
@@ -209,9 +214,9 @@ namespace evemap_core
 
         }
 
-        private Alliance getAllianceWithHighestInfluence(Dictionary<Alliance, double> totalInfluence, bool isOld)
+        private long? getAllianceWithHighestInfluence(Dictionary<long, double> totalInfluence, bool isOld)
         {
-            Alliance best = null;
+            long? best = null;
             double d;
             double priMax = max;
             
@@ -239,7 +244,7 @@ namespace evemap_core
         }
 
         private void getTotalInfluenceforPoint(int x, int y, List<SolarSystem> sSov,
-            Dictionary<Alliance, double> totalInfluence)
+            Dictionary<long, double> totalInfluence)
         {
             int dx, dy, len2;
             double d;
@@ -251,55 +256,151 @@ namespace evemap_core
 //                    )
 ////                .Where(p => (Math.Pow(x - p.x, 2) + Math.Pow(y - p.y, 2)) < 160000)
 //                .Where(p => p.alliances.Count > 0);
-            var ssfilter = new List<SolarSystem>();
-            var xkey = this.map.systemMap.Keys.Where(p=>p>x-400 && p<x+400).ToList();
 
-            foreach (var x1 in xkey)
+            var xmin = (x < 400 ? 0 : x - 400)/MapConstants.CALC_SAMPLE;
+            var xmax = (x+400 > MapConstants.HORIZONTAL_SIZE  ? MapConstants.HORIZONTAL_SIZE : x + 400)/ MapConstants.CALC_SAMPLE;
+            var ymin =(y < 400 ? 0 : y - 400) / MapConstants.CALC_SAMPLE;
+            var ymax = (y+400 > MapConstants.VERTICAL_SIZE ? MapConstants.VERTICAL_SIZE : y + 400) / MapConstants.CALC_SAMPLE;
+
+            for (int xx = xmin; xx <= xmax; xx++)
             {
-           
-                var ykey = this.map.systemMap[x1].Keys.Where(p => p > y - 400 && p < y + 400).ToList();
-                foreach (var y2 in ykey)
+                for (int yy = ymin; yy <= ymax; yy++)
                 {
-                    ssfilter.AddRange(this.map.systemMap[x1][y2]);
+                    bool has_point_in_c = false;
+                    bool all_point_in_c = true;
+                    //TOP LEFT
+                    dx = x - xx * MapConstants.CALC_SAMPLE;
+                    dy = y - yy * MapConstants.CALC_SAMPLE;
+                    len2 = dx * dx + dy * dy;
+                    if (dx > 400 || dx < -400|| dy > 400 || dy < -400 || len2 > 160000)
+                        all_point_in_c = false;
+                    else
+                        has_point_in_c = true;
+
+                    //TOP RIGHT
+                    dx = x - (xx + 1) * MapConstants.CALC_SAMPLE;
+                    dy = y - yy * MapConstants.CALC_SAMPLE;
+                    len2 = dx * dx + dy * dy;
+                    if (dx > 400 || dx < -400 || dy > 400 || dy < -400 || len2 > 160000)
+                        all_point_in_c = false;
+                    else
+                        has_point_in_c = true;
+
+                    //BTN LEFT
+                    dx = x - xx * MapConstants.CALC_SAMPLE;
+                    dy = y - (yy + 1) * MapConstants.CALC_SAMPLE;
+                    len2 = dx * dx + dy * dy;
+                    if (dx > 400 || dx < -400 || dy > 400 || dy < -400 || len2 > 160000)
+                        all_point_in_c = false;
+                    else
+                        has_point_in_c = true;
+
+                    //BTN RIGHT
+                    dx = x - (xx + 1) * MapConstants.CALC_SAMPLE;
+                    dy = y - (yy + 1) * MapConstants.CALC_SAMPLE;
+                    len2 = dx * dx + dy * dy;
+                    if (dx > 400 || dx < -400 || dy > 400 || dy < -400 || len2 > 160000)
+                        all_point_in_c = false;
+                    else
+                        has_point_in_c = true;
+
+                    if (!has_point_in_c)
+                    {
+                        continue; //no points in circle
+                       
+                    }
+
+
+
+                    if (this.map.systemMap[xx, yy] != null)
+                    {
+                        foreach (var ss in this.map.systemMap[xx, yy])
+                        {
+                            if (all_point_in_c && false)//TODO 似乎有bug
+                            {
+                            }
+                            else
+                            {
+                                dx = x - ss.x;
+
+                                if (dx > 400 || dx < -400)
+                                {
+                                    continue;
+                                }
+
+                                dy = y - ss.y;
+
+                                if (dy > 400 || dy < -400)
+                                {
+                                    continue;
+                                }
+
+                                len2 = dx * dx + dy * dy;
+                                if (len2 > 160000)
+                                {
+                                    continue;
+                                }
+                            }
+
+                            for (int loc = 0; loc < ss.alliances.Count; loc++)
+                            {
+                                d = 0;
+                                totalInfluence.TryGetValue(ss.alliances[loc].id, out d);
+                                totalInfluence[ss.alliances[loc].id] = ss.influences[loc] / (INSENSITIVITY + len2) + d;
+                            }
+                        }
+                    }
                 }
-
             }
-
-           
+//            var ssfilter = new List<SolarSystem>();
+//            var xkey = this.map.systemMap.Keys.Where(p=>p>x-400 && p<x+400).ToList();
 //
-//            var ssfilter1 = this.map.systemMap[x];
-//            if (ssfilter1 == null)
+//            foreach (var x1 in xkey)
 //            {
-//                return;}
-//    var ssfilter = ssfilter1.AsParallel().Where(p => 
-//            
-//            p.y<(y+400) && p.y>(y-400)
-//            )
-////                .Where(p => (Math.Pow(x - p.x, 2) + Math.Pow(y - p.y, 2)) < 160000)
-//        .ToList();
-            foreach (var ss in ssfilter)
-            {
-                dx = x - ss.x;
-
-                //                                if (dx > 400 || dx < -400)
-                //                                    continue;
-                dy = y - ss.y;
-
-                //                                if (dy > 400 || dy < -400)
-                //                                    continue;
-                len2 = dx * dx + dy * dy;
-
-               
-
-
-                for (int loc = 0; loc < ss.alliances.Count; loc++)
-                {
-                    d = 0;
-                    totalInfluence.TryGetValue(ss.alliances[loc], out d);
-                    totalInfluence[ss.alliances[loc]] = ss.influences[loc] / (INSENSITIVITY + len2) + d;
-                }
-            }
-          
+//           
+//                var ykey = this.map.systemMap[x1].Keys.Where(p => p > y - 400 && p < y + 400).ToList();
+//                foreach (var y2 in ykey)
+//                {
+//                    ssfilter.AddRange(this.map.systemMap[x1][y2]);
+//                }
+//
+//            }
+//
+//           
+////
+////            var ssfilter1 = this.map.systemMap[x];
+////            if (ssfilter1 == null)
+////            {
+////                return;}
+////    var ssfilter = ssfilter1.AsParallel().Where(p => 
+////            
+////            p.y<(y+400) && p.y>(y-400)
+////            )
+//////                .Where(p => (Math.Pow(x - p.x, 2) + Math.Pow(y - p.y, 2)) < 160000)
+////        .ToList();
+//            foreach (var ss in ssfilter)
+//            {
+//                dx = x - ss.x;
+//
+//                //                                if (dx > 400 || dx < -400)
+//                //                                    continue;
+//                dy = y - ss.y;
+//
+//                //                                if (dy > 400 || dy < -400)
+//                //                                    continue;
+//                len2 = dx * dx + dy * dy;
+//
+//               
+//
+//
+//                for (int loc = 0; loc < ss.alliances.Count; loc++)
+//                {
+//                    d = 0;
+//                    totalInfluence.TryGetValue(ss.alliances[loc].id, out d);
+//                    totalInfluence[ss.alliances[loc].id] = ss.influences[loc] / (INSENSITIVITY + len2) + d;
+//                }
+//            }
+//          
 
 
 
@@ -317,12 +418,12 @@ namespace evemap_core
         public double[] previnf=new double[MapConstants.HORIZONTAL_SIZE+1];
         public Alliance[] prevRow=new Alliance[MapConstants.HORIZONTAL_SIZE];
         public Alliance[,] sovMap = new Alliance[MapConstants.HORIZONTAL_SIZE / MapConstants.SAMPLE_RATE,MapConstants.VERTICAL_SIZE / MapConstants.SAMPLE_RATE];
-        
 
-//        public List<SolarSystem>[] systemMap=new List<SolarSystem>[MapConstants.HORIZONTAL_SIZE];
 
-       public  Dictionary<int,Dictionary<int,List<SolarSystem>>> systemMap=new Dictionary<int, Dictionary<int, List<SolarSystem>>>();
-        public Dictionary<int,HashSet<int>> xycache=new Dictionary<int, HashSet<int>>();
+        //        public List<SolarSystem>[] systemMap=new List<SolarSystem>[MapConstants.HORIZONTAL_SIZE];
+        public List<SolarSystem>[,] systemMap=new List<SolarSystem>[MapConstants.HORIZONTAL_SIZE / MapConstants.CALC_SAMPLE + 1, MapConstants.VERTICAL_SIZE / MapConstants.CALC_SAMPLE + 1];
+//       public  Dictionary<int,Dictionary<int,List<SolarSystem>>> systemMap=new Dictionary<int, Dictionary<int, List<SolarSystem>>>();
+//        public Dictionary<int,HashSet<int>> xycache=new Dictionary<int, HashSet<int>>();
         public InfluenceCalculator(DataManager dataManager, string sovDate, HashSet<Jump> jumps)
         {
             this.dataManager = dataManager;
@@ -339,19 +440,15 @@ namespace evemap_core
             {
                 Console.WriteLine(i0);
                 i0++;
-                if (!systemMap.ContainsKey(ss.x))
+                var sx = ss.x / MapConstants.CALC_SAMPLE;
+                var sy = ss.y / MapConstants.CALC_SAMPLE;
+                if (systemMap[sx, sy] == null)
                 {
-                    systemMap[ss.x] = new Dictionary<int, List<SolarSystem>>();
-                    xycache[ss.x]=new HashSet<int>();
+                    systemMap[sx,sy]=new List<SolarSystem>();
                 }
-               
-                if (!systemMap[ss.x].ContainsKey(ss.y))
-                {
-                    systemMap[ss.x][ss.y] = new List<SolarSystem>();
-                    xycache[ss.x].Add(ss.y);
-                }
+                systemMap[sx,sy].Add(ss);
 
-                systemMap[ss.x][ss.y].Add(ss);
+                
                
             }
 
