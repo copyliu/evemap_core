@@ -27,7 +27,7 @@ namespace evemap_core
                 dateString = date;
             }
 
-            MapConstants.THREADPOOL_SIZE = 1;
+//            MapConstants.THREADPOOL_SIZE = 1;
             DAL.connString = connectionstring;
 //            Connection[] db;
             try

@@ -266,61 +266,15 @@ namespace evemap_core
             {
                 for (int yy = ymin; yy <= ymax; yy++)
                 {
-                    bool has_point_in_c = false;
-                    bool all_point_in_c = true;
-                    //TOP LEFT
-                    dx = x - xx * MapConstants.CALC_SAMPLE;
-                    dy = y - yy * MapConstants.CALC_SAMPLE;
-                    len2 = dx * dx + dy * dy;
-                    if (dx > 400 || dx < -400|| dy > 400 || dy < -400 || len2 > 160000)
-                        all_point_in_c = false;
-                    else
-                        has_point_in_c = true;
-
-                    //TOP RIGHT
-                    dx = x - (xx + 1) * MapConstants.CALC_SAMPLE;
-                    dy = y - yy * MapConstants.CALC_SAMPLE;
-                    len2 = dx * dx + dy * dy;
-                    if (dx > 400 || dx < -400 || dy > 400 || dy < -400 || len2 > 160000)
-                        all_point_in_c = false;
-                    else
-                        has_point_in_c = true;
-
-                    //BTN LEFT
-                    dx = x - xx * MapConstants.CALC_SAMPLE;
-                    dy = y - (yy + 1) * MapConstants.CALC_SAMPLE;
-                    len2 = dx * dx + dy * dy;
-                    if (dx > 400 || dx < -400 || dy > 400 || dy < -400 || len2 > 160000)
-                        all_point_in_c = false;
-                    else
-                        has_point_in_c = true;
-
-                    //BTN RIGHT
-                    dx = x - (xx + 1) * MapConstants.CALC_SAMPLE;
-                    dy = y - (yy + 1) * MapConstants.CALC_SAMPLE;
-                    len2 = dx * dx + dy * dy;
-                    if (dx > 400 || dx < -400 || dy > 400 || dy < -400 || len2 > 160000)
-                        all_point_in_c = false;
-                    else
-                        has_point_in_c = true;
-
-                    if (!has_point_in_c)
-                    {
-                        continue; //no points in circle
-                       
-                    }
-
+                   
 
 
                     if (this.map.systemMap[xx, yy] != null)
                     {
                         foreach (var ss in this.map.systemMap[xx, yy])
                         {
-                            if (all_point_in_c && false)//TODO 似乎有bug
-                            {
-                            }
-                            else
-                            {
+                            
+                           
                                 dx = x - ss.x;
 
                                 if (dx > 400 || dx < -400)
@@ -340,7 +294,7 @@ namespace evemap_core
                                 {
                                     continue;
                                 }
-                            }
+                           
 
                             for (int loc = 0; loc < ss.alliances.Count; loc++)
                             {
